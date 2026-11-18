@@ -1,6 +1,9 @@
 import { NextFunction, Request, Response } from "express";
+import { monitorEventLoopDelay } from "node:perf_hooks";
 
 const UMBRAL_LENTA_MS = Number(process.env.UMBRAL_LENTA_MS ?? 1000);
+const retardoBucle = monitorEventLoopDelay({ resolution: 10 });
+retardoBucle.enable();
 
 interface Estadistica {
     peticiones: number;
@@ -36,5 +39,10 @@ export function resumenMetricas() {
             maxMs: e.maxMs,
             lentas: e.lentas,
         })),
+        bucle: {
+            p50Ms: Math.round(retardoBucle.percentile(50) / 1e6),
+            p99Ms: Math.round(retardoBucle.percentile(99) / 1e6),
+            maxMs: Math.round(retardoBucle.max / 1e6),
+        },
     };
 }
