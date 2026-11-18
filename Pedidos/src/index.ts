@@ -1,6 +1,7 @@
 
 import express, {Request, Response} from 'express';
 import {randomUUID} from "node:crypto";
+import { medirLatencia, resumenMetricas } from "./metricas";
 import { contarPrimos, ejecutarReporte } from "./reporte";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -17,7 +18,11 @@ interface Pedido {
 const pedidos: Pedido[] = [];
 const app = express();
 app.use(express.json());
+app.use(medirLatencia);
 
+app.get("/metricas", (_req, res) => {
+    res.json(resumenMetricas());
+});
 
 function registrarReporte(
     modo: string,
