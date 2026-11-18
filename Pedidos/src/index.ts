@@ -1,7 +1,9 @@
 
 import express, {Request, Response} from 'express';
 import {randomUUID} from "node:crypto";
+import { availableParallelism } from "node:os";
 import { medirLatencia, resumenMetricas } from "./metricas";
+import { contarPrimosEnPool, estadoPool } from "./pool";
 import { contarPrimos, ejecutarReporte } from "./reporte";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -21,7 +23,7 @@ app.use(express.json());
 app.use(medirLatencia);
 
 app.get("/metricas", (_req, res) => {
-    res.json(resumenMetricas());
+    res.json({ ...resumenMetricas(), nucleos: availableParallelism(), pool: estadoPool() });
 });
 
 function registrarReporte(
@@ -40,6 +42,10 @@ function registrarReporte(
             const primos = await calcular(n);
             res.json({ modo, n, primos, ms: Math.round(performance.now() - inicio) });
         } catch (error) {
+            if (error instanceof Error && error.name === "PoolLleno") {
+                res.set("Retry-After", "1").status(503).json({ error: error.name, pool: estadoPool() });
+                return;
+            }
             throw error;
         }
     });
@@ -47,6 +53,7 @@ function registrarReporte(
 
 registrarReporte("bloqueante", contarPrimos);
 registrarReporte("worker", ejecutarReporte);
+registrarReporte("pool", contarPrimosEnPool);
 
 // HEALTH: comprueba que Pedidos está encendido
 app.get("/health", (_req: Request, res: Response) => {
